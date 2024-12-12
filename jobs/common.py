@@ -42,7 +42,7 @@ def excepthook(logger, job_type, value, traceback):
     logger.exception("%s failed", job_type, exc_info=value)
 
 
-def filter_hosts_in_state_using_custom_staleness(logger, session, state: list, config=None):
+def filter_hosts_in_state_using_custom_staleness(logger, session, state: list):
     staleness_objects = session.query(Staleness).all()
     org_ids = []
 
@@ -55,25 +55,25 @@ def filter_hosts_in_state_using_custom_staleness(logger, session, state: list, c
         query_filters.append(
             and_(
                 (Host.org_id == staleness_obj.org_id),
-                find_hosts_by_staleness_job(state, identity, config),
+                find_hosts_by_staleness_job(state, identity),
             )
         )
     return query_filters, org_ids
 
 
-def filter_hosts_in_state_using_sys_default_staleness(logger, org_ids, state: list, config=None) -> ColumnElement:
+def filter_hosts_in_state_using_sys_default_staleness(logger, org_ids, state: list) -> ColumnElement:
     # Use the hosts_ids_list to exclude hosts that were found with custom staleness
     logger.debug("Looking for hosts that use system default staleness")
-    return and_(~Host.org_id.in_(org_ids), find_hosts_sys_default_staleness(state, config))
+    return and_(~Host.org_id.in_(org_ids), find_hosts_sys_default_staleness(state))
 
 
-def find_hosts_in_state(logger, session, state: list, config=None):
+def find_hosts_in_state(logger, session, state: list):
     # Find all host ids that are using custom staleness
-    query_filters, org_ids = filter_hosts_in_state_using_custom_staleness(logger, session, state, config)
+    query_filters, org_ids = filter_hosts_in_state_using_custom_staleness(logger, session, state)
 
     # Find all host ids that are not using custom staleness,
     # excluding the hosts for the org_ids that use custom staleness
-    query_filters.append(filter_hosts_in_state_using_sys_default_staleness(logger, org_ids, state, config))
+    query_filters.append(filter_hosts_in_state_using_sys_default_staleness(logger, org_ids, state))
 
     return query_filters
 
