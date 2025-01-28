@@ -661,6 +661,26 @@ class Staleness(db.Model):  # type: ignore [name-defined]
     modified_on = db.Column(db.DateTime(timezone=True), default=_time_now, onupdate=_time_now)
 
 
+class HostInventoryMetadata(db.Model):  # type: ignore [name-defined]
+    __tablename__ = "hbi_metadata"
+    __table_args__ = (
+        UniqueConstraint("name", "type", name="hbi_metadata_unique_constraint"),
+        {"schema": INVENTORY_SCHEMA},
+    )
+
+    def __init__(self, name, type):
+        self.name = name
+        self.type = type
+
+    def _update_last_update(self):
+        self.last_update = datetime.now(timezone.utc)
+
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = db.Column(db.String(255))
+    type = db.Column(db.String(255))
+    last_update = db.Column(db.DateTime(timezone=True), default=_time_now, onupdate=_time_now)
+
+
 class DiskDeviceSchema(MarshmallowSchema):
     device = fields.Str(validate=marshmallow_validate.Length(max=2048))
     label = fields.Str(validate=marshmallow_validate.Length(max=1024))
