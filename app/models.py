@@ -283,6 +283,7 @@ class Host(LimitedHost):
         stale_timestamp=None,
         reporter=None,
         per_reporter_staleness=None,
+        staleness_func=None,
         groups=None,
     ):
         if tags is None:
@@ -303,12 +304,14 @@ class Host(LimitedHost):
             canonical_facts, display_name, ansible_host, account, org_id, facts, tags, system_profile_facts, groups
         )
 
+        self.staleness_func = staleness_func
+
         # without reporter and stale_timestamp host payload is invalid.
         self._update_stale_timestamp(stale_timestamp, reporter)
 
         self.per_reporter_staleness = per_reporter_staleness or {}
         if not per_reporter_staleness:
-            self._update_per_reporter_staleness(reporter)
+            self._update_per_reporter_staleness(reporter, self.staleness_func)
 
     def save(self):
         self._cleanup_tags()
@@ -332,7 +335,7 @@ class Host(LimitedHost):
             self.update_system_profile(input_host.system_profile_facts)
 
         self._update_stale_timestamp(input_host.stale_timestamp, input_host.reporter)
-        self._update_per_reporter_staleness(input_host.reporter)
+        self._update_per_reporter_staleness(input_host.reporter, input_host.staleness_func)
 
     def patch(self, patch_data):
         logger.debug("patching host (id=%s) with data: %s", self.id, patch_data)
@@ -384,7 +387,9 @@ class Host(LimitedHost):
             self.stale_timestamp = stale_timestamp
         self.reporter = reporter
 
-    def _update_per_reporter_staleness(self, reporter):
+    def _update_per_reporter_staleness(self, reporter, staleness_func):
+        self._update_modified_date()
+
         if not self.per_reporter_staleness:
             self.per_reporter_staleness = {}
 
@@ -394,9 +399,13 @@ class Host(LimitedHost):
         if old_reporter := NEW_TO_OLD_REPORTER_MAP.get(reporter):
             self.per_reporter_staleness.pop(old_reporter, None)
 
+        timestamps = staleness_func(self)
+
         self.per_reporter_staleness[reporter].update(
-            stale_timestamp=self.stale_timestamp.isoformat(),
-            last_check_in=datetime.now(timezone.utc).isoformat(),
+            stale_timestamp=timestamps["stale_timestamp"].isoformat(),
+            stale_warning_timestamp=timestamps["stale_warning_timestamp"].isoformat(),
+            culled_timestamp=timestamps["culled_timestamp"].isoformat(),
+            last_check_in=self.modified_on.isoformat(),
             check_in_succeeded=True,
         )
         orm.attributes.flag_modified(self, "per_reporter_staleness")
@@ -929,7 +938,7 @@ class HostSchema(LimitedHostSchema):
     reporter = fields.Str(required=True, validate=marshmallow_validate.Length(min=1, max=255))
 
     @staticmethod
-    def build_model(data, canonical_facts, facts, tags):
+    def build_model(data, canonical_facts, facts, tags, staleness_func):
         return Host(
             canonical_facts,
             data.get("display_name"),
@@ -942,6 +951,7 @@ class HostSchema(LimitedHostSchema):
             data["stale_timestamp"],
             data["reporter"],
             data.get("groups", []),
+            staleness_func=staleness_func,
         )
 
     @validates("stale_timestamp")
