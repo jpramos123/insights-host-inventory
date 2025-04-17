@@ -83,7 +83,14 @@ def _last_run_time_diff_in_sec(stale_host_timestamp: HostInventoryMetadata, job_
     now = job_start_time
     last_update = stale_host_timestamp.last_succeeded
     last_run_diff = now - last_update
-    return int(last_run_diff.total_seconds())
+    last_run_secs = int(last_run_diff.total_seconds())
+
+    # if last_run_secs is lower than zero, assume 1 hour
+    # window. This will only happen in the first run, in a fresh
+    # environment, where the hbi_metadata table is empty.
+    if last_run_secs < 0:
+        last_run_secs = 3600  # 1 hour in seconds
+    return last_run_secs
 
 
 def _find_stale_hosts_using_custom_staleness(
