@@ -25,8 +25,8 @@ RUNTIME_ENVIRONMENT = RuntimeEnvironment.JOB
 def receive_before_update(mapper, connection, target):  # noqa: ARG001
     # Make sure that the modified_on field is not
     # updated in the table
-    isnp = sa.inspect(target)
-    flag_changed, _, _ = isnp.attrs.per_reporter_staleness.history
+    insp = sa.inspect(target)
+    flag_changed, _, _ = insp.attrs.per_reporter_staleness.history
     if flag_changed:
         orm.attributes.flag_modified(target, "modified_on")
 
