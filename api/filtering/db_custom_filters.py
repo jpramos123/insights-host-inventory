@@ -129,6 +129,8 @@ def _convert_dict_to_json_path_and_value(
         return (key, *next_val), pg_op, deepest_value  # type: ignore [return-value]
     else:
         # Get the final jsonb path node and its value; no comparator was specified
+        if val == "":
+            return (key,), None, ""
         return (key,), None, val
 
 
@@ -417,6 +419,8 @@ def build_single_filter(filter_param: dict) -> ColumnElement:
             if not eval_jsonb_path:
                 target_field = _handle_empty_string_cast(target_field, column)
                 pg_op = ColumnOperators.__eq__
+            else:
+                value = None
         elif pg_cast := FIELD_FILTER_TO_POSTGRES_CAST.get(field_filter):
             # Cast column and value for normal (non-empty) values
             target_field = target_field.cast(pg_cast)
