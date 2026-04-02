@@ -16,6 +16,7 @@ from api import api_operation
 from api import flask_json_response
 from api import json_error_response
 from api import metrics
+from api.cache import delete_cached_staleness
 from api.cache import delete_cached_system_keys
 from api.host_query import staleness_timestamps
 from api.staleness_query import get_staleness_obj
@@ -257,6 +258,7 @@ def create_staleness(body):
     try:
         # Create account staleness with validated data
         created_staleness = add_staleness(validated_data)
+        delete_cached_staleness(org_id)
         _async_update_host_staleness(identity, created_staleness, request_id)
         log_create_staleness_succeeded(logger, created_staleness.id)
     except IntegrityError:
@@ -279,6 +281,7 @@ def delete_staleness():
     request_id = threadctx.request_id
     try:
         remove_staleness()
+        delete_cached_staleness(org_id)
         staleness = get_sys_default_staleness_api(identity)
         _async_update_host_staleness(identity, staleness, request_id)
         return flask_json_response(None, HTTPStatus.NO_CONTENT)
@@ -306,6 +309,7 @@ def update_staleness(body):
     org_id = identity.org_id
     try:
         updated_staleness = patch_staleness(validated_data)
+        delete_cached_staleness(org_id)
         if updated_staleness is None:
             # since update only return None with no record instead of exception.
             raise NoResultFound
